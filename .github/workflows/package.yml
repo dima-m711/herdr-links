@@ -1,0 +1,155 @@
+name: Validate marketplace and publish private package
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Validate source and package
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 20
+          cache: npm
+          registry-url: https://npm.pkg.github.com
+          scope: "@dima-m711"
+      - name: Set up Python reference runtime
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11"
+      - name: Install development dependencies
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Run TypeScript and Python reference tests
+        run: npm test
+      - name: Build TypeScript runtime
+        run: npm run build
+      - name: Verify source-free package contents
+        run: npm run check:package
+      - name: Verify clean marketplace checkout build
+        run: npm run check:github-install
+      - name: Reject private verification data
+        run: npm run check:public-content
+      - name: Audit reachable Git history
+        run: npm run check:public-history
+
+  publish:
+    name: Publish immutable private prerelease
+    if: github.repository == 'dima-m711/herdr-links' && github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Node.js for GitHub Packages
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 20
+          cache: npm
+          registry-url: https://npm.pkg.github.com
+          scope: "@dima-m711"
+      - name: Install development dependencies
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Assign unique prerelease version
+        id: version
+        shell: bash
+        run: |
+          set -euo pipefail
+          base_version=$(node -p "require('./package.json').version")
+          version="${base_version}-main.${GITHUB_RUN_NUMBER}"
+          npm version "$version" --no-git-tag-version
+          node scripts/set-release-version.mjs "$version"
+          printf 'version=%s\n' "$version" >> "$GITHUB_OUTPUT"
+      - name: Build and verify publish payload
+        run: |
+          npm run build
+          npm run check:package
+      - name: Check whether this workflow version is already published
+        id: existing
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ steps.version.outputs.version }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if npm view "@dima-m711/herdr-links@${VERSION}" version --registry https://npm.pkg.github.com >/dev/null 2>&1; then
+            echo 'published=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'published=false' >> "$GITHUB_OUTPUT"
+          fi
+      - name: Publish package without lifecycle scripts
+        if: steps.existing.outputs.published != 'true'
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npm publish --ignore-scripts --tag candidate
+      - name: Report idempotent rerun
+        if: steps.existing.outputs.published == 'true'
+        run: echo "@dima-m711/herdr-links@${{ steps.version.outputs.version }} is already published"
+      - name: Verify the published package in an empty prefix
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ steps.version.outputs.version }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          prefix="${RUNNER_TEMP}/herdr-links-package-smoke"
+          npm install --prefix "$prefix" --ignore-scripts "@dima-m711/herdr-links@${VERSION}"
+          actual=$(env -u NODE_AUTH_TOKEN "$prefix/node_modules/.bin/herdr-links" --version)
+          test "$actual" = "herdr-links ${VERSION}"
+
+  promote:
+    name: Point next at the current successful main build
+    if: github.repository == 'dima-m711/herdr-links' && github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: publish
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Set up Node.js for GitHub Packages
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 20
+          registry-url: https://npm.pkg.github.com
+          scope: "@dima-m711"
+      - name: Promote only if this commit is still main
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ needs.publish.outputs.version }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          current_main=$(gh api "repos/${GITHUB_REPOSITORY}/commits/main" --jq .sha)
+          if [ "$current_main" = "$GITHUB_SHA" ]; then
+            npm dist-tag add "@dima-m711/herdr-links@${VERSION}" next --registry https://npm.pkg.github.com
+            echo "next -> ${VERSION}"
+          else
+            echo "main advanced to ${current_main}; leaving next unchanged"
+          fi
+          if npm dist-tag ls @dima-m711/herdr-links --registry https://npm.pkg.github.com | grep -q '^candidate:'; then
+            npm dist-tag rm @dima-m711/herdr-links candidate --registry https://npm.pkg.github.com
+          fi

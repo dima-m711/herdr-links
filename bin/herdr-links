@@ -1,0 +1,8 @@
+#!/bin/sh
+set -eu
+ROOT=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd -P)
+if [ ! -f "$ROOT/dist/cli.js" ]; then
+  printf '%s\n' 'herdr-links: TypeScript runtime is not built; run npm ci && npm run build' >&2
+  exit 1
+fi
+exec node "$ROOT/dist/cli.js" "$@"

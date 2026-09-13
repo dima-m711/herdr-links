@@ -1,0 +1,61 @@
+{
+  "name": "@dima-m711/herdr-links",
+  "version": "0.4.0",
+  "description": "Session-bound navigation links for Pi reports in Herdr",
+  "keywords": [
+    "herdr",
+    "plugin",
+    "pi",
+    "navigation"
+  ],
+  "homepage": "https://github.com/dima-m711/herdr-links#readme",
+  "bugs": "https://github.com/dima-m711/herdr-links/issues",
+  "type": "module",
+  "bin": {
+    "herdr-links": "dist/cli.js"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/core.d.ts",
+      "import": "./dist/core.js"
+    }
+  },
+  "files": [
+    "dist",
+    "herdr-plugin.toml",
+    "agent-instructions.md",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "clean": "rm -rf dist .test-dist",
+    "build": "npm run clean:dist && tsc -p tsconfig.json",
+    "clean:dist": "rm -rf dist",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.test.json --noEmit",
+    "test:typescript": "rm -rf .test-dist && tsc -p tsconfig.test.json && node --test .test-dist/tests-ts/*.test.js",
+    "test:python-reference": "python3 -m unittest discover -s tests -v",
+    "test": "npm run typecheck && npm run test:typescript && npm run test:python-reference",
+    "check:package": "node scripts/check-package.mjs",
+    "check:github-install": "node scripts/check-github-install.mjs",
+    "check:public-content": "node scripts/check-public-content.mjs",
+    "check:public-history": "node scripts/check-public-history.mjs",
+    "prepack": "npm run build"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/dima-m711/herdr-links.git"
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com",
+    "access": "restricted",
+    "tag": "next"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^20.19.43",
+    "typescript": "^5.9.0"
+  }
+}

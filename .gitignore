@@ -1,0 +1,9 @@
+__pycache__/
+*.pyc
+.pi/
+node_modules/
+dist/
+.test-dist/
+coverage/
+docs/verification/
+*.tgz

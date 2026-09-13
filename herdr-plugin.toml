@@ -1,0 +1,33 @@
+id = "herdr-links"
+name = "Herdr Links"
+version = "0.4.0"
+min_herdr_version = "0.7.5"
+description = "Session-bound navigation links for agent, workspace, tab, and pane references in Herdr."
+platforms = ["macos"]
+
+[[build]]
+command = ["npm", "ci", "--include=dev", "--ignore-scripts", "--no-audit", "--no-fund"]
+
+[[build]]
+command = ["npm", "run", "build"]
+
+[[actions]]
+id = "setup"
+title = "Herdr Links: install Pi instructions"
+command = ["node", "./dist/cli.js", "setup"]
+
+[[actions]]
+id = "cleanup"
+title = "Herdr Links: remove Pi instructions"
+command = ["node", "./dist/cli.js", "cleanup"]
+
+[[actions]]
+id = "navigate"
+title = "Herdr Links: navigate clicked reference"
+command = ["node", "./dist/cli.js", "handle"]
+
+[[link_handlers]]
+id = "navigation-v1"
+title = "Navigate a verified local Herdr reference"
+pattern = '^(?:https://herdr\.invalid/v1|herdr://navigation/v1)/[0-9a-f]{64}/(?:(?:agent|pane)/w[0-9A-HJKMNP-TV-Z]{1,13}:p[0-9A-HJKMNP-TV-Z]{1,13}|workspace/w[0-9A-HJKMNP-TV-Z]{1,13}|tab/w[0-9A-HJKMNP-TV-Z]{1,13}:t[0-9A-HJKMNP-TV-Z]{1,13})$'
+action = "navigate"
