@@ -16,8 +16,10 @@ import {
   VERSION,
   cleanup,
   cleanupInstructionFile,
+  claudeCodeMemoryFile,
   install,
   installInstructions,
+  instructionFileFor,
   migrateLegacyRegistration,
   parseNavigationUrl,
   pluginRegistryPath,
@@ -196,6 +198,50 @@ test("Pi instruction paths honor PI_CODING_AGENT_DIR and active override files",
   }
 });
 
+test("Claude Code user memory path resolves from the config directory", () => {
+  const directory = temporaryDirectory();
+  try {
+    const home = join(directory, "home");
+    const config = join(directory, "cfg");
+    mkdirSync(config, { recursive: true });
+    writeFileSync(join(config, "CLAUDE.md"), "# Memory\n");
+    assert.equal(claudeCodeMemoryFile({ HOME: home }), join(home, ".claude", "CLAUDE.md"));
+    assert.equal(claudeCodeMemoryFile({ HOME: home, CLAUDE_CONFIG_DIR: config }), join(config, "CLAUDE.md"));
+    assert.equal(claudeCodeMemoryFile({ HOME: home, CLAUDE_CONFIG_DIR: "relative" }), join(home, ".claude", "CLAUDE.md"));
+    assert.equal(instructionFileFor("claude-code", { HOME: home }), join(home, ".claude", "CLAUDE.md"));
+    assert.equal(instructionFileFor("pi", { HOME: home }), join(home, ".pi", "agent", "AGENTS.md"));
+    assert.throws(() => instructionFileFor("gemini", { HOME: home }), /unsupported agent/u);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test("Claude Code and Pi instruction blocks install and remove independently", () => {
+  const directory = temporaryDirectory();
+  try {
+    const piFile = join(directory, "pi", "AGENTS.md");
+    const claudeFile = join(directory, "claude", "CLAUDE.md");
+    const snippet = join(directory, "snippet.md");
+    writeFileSync(snippet, "use @PLUGIN_ROOT@");
+    const root = "/opt/herdr-links";
+    const piFirst = installInstructions(piFile, snippet, root);
+    const claudeFirst = installInstructions(claudeFile, snippet, root);
+    assert.equal(piFirst.changed, true);
+    assert.equal(claudeFirst.changed, true);
+    assert.equal(installInstructions(piFile, snippet, root).changed, false);
+    const claudeText = readFileSync(claudeFile, "utf8");
+    assert.match(claudeText, /BEGIN HERDR LINKS/u);
+    assert.match(claudeText, new RegExp(root, "u"));
+    assert.match(readFileSync(piFile, "utf8"), /BEGIN HERDR LINKS/u);
+    assert.equal(uninstallInstructions(claudeFile).changed, true);
+    assert.equal(readFileSync(piFile, "utf8").includes(root), true);
+    assert.equal(uninstallInstructions(piFile).changed, true);
+    assert.equal(readFileSync(piFile, "utf8"), "");
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
 test("inactive Pi context symlink aliases do not block the active regular file", () => {
   const directory = temporaryDirectory();
   try {
@@ -243,6 +289,28 @@ test("setup refuses a managed block shadowed by a higher-priority context file",
     writeFileSync(override, "# Override\n");
     assert.throws(() => setupInstructionFile({ PI_CODING_AGENT_DIR: profile }), /shadowed/u);
     assert.equal(cleanupInstructionFile({ PI_CODING_AGENT_DIR: profile }), agents);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test("resolving a Pi instruction file keeps the ambiguity guard", () => {
+  const directory = temporaryDirectory();
+  try {
+    const profile = join(directory, "profile");
+    const agents = join(profile, "AGENTS.md");
+    mkdirSync(profile);
+    const block = `${MANAGED_BLOCK_BEGIN}\n\nold\n\n<!-- END HERDR LINKS -->\n`;
+    writeFileSync(agents, block);
+    // One managed block is unambiguous and both entry points agree.
+    assert.equal(instructionFileFor("pi", { PI_CODING_AGENT_DIR: profile }), agents);
+    assert.equal(cleanupInstructionFile({ PI_CODING_AGENT_DIR: profile }), agents);
+    // A second managed block in a lower-priority file is ambiguous. The legacy
+    // cleanup path refuses it, and the agent-name lookup must refuse it too,
+    // rather than silently cleaning whichever file it happens to check first.
+    writeFileSync(join(profile, "CLAUDE.md"), block);
+    assert.throws(() => cleanupInstructionFile({ PI_CODING_AGENT_DIR: profile }), /multiple Pi context files/u);
+    assert.throws(() => instructionFileFor("pi", { PI_CODING_AGENT_DIR: profile }), /multiple Pi context files/u);
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }
