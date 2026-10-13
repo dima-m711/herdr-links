@@ -55,8 +55,9 @@ const CUSTOM_URL_PATTERN = new RegExp(
   `^herdr://navigation/v1/([0-9a-f]{64})/(agent|workspace|tab|pane)/(${WORKSPACE_ID}(?::[pt]${ID_NUMBER})?)$`,
 );
 
-const SUPPORTED_RUNTIMES = new Set(["0.7.5/18", "0.9.0/22"]);
-const SUPPORTED_CLI_VERSIONS = new Set(["herdr 0.7.5", "herdr 0.9.0"]);
+const SUPPORTED_RUNTIMES = new Set(["0.7.5/18", "0.9.0/22", "0.9.3/22"]);
+const CUSTOM_LINK_VERSIONS = new Set(["0.9.0", "0.9.3"]);
+const SUPPORTED_CLI_VERSIONS = new Set(["herdr 0.7.5", "herdr 0.9.0", "herdr 0.9.3"]);
 const FOCUS_METHODS: Readonly<Record<TargetKind, readonly [string, string, string]>> = {
   agent: ["pane.focus", "pane_id", "pane_info"],
   workspace: ["workspace.focus", "workspace_id", "workspace_info"],
@@ -221,7 +222,7 @@ export function formatNavigationUrl(kind: string, target: string, fingerprint: s
   validateTarget(kind, target);
   if (!/^[0-9a-f]{64}$/u.test(fingerprint)) throw new HerdrLinksError("invalid session fingerprint");
   if (version === "0.7.5") return `https://herdr.invalid/v1/${fingerprint}/${kind}/${target}`;
-  if (version === "0.9.0") return `herdr://navigation/v1/${fingerprint}/${kind}/${target}`;
+  if (CUSTOM_LINK_VERSIONS.has(version)) return `herdr://navigation/v1/${fingerprint}/${kind}/${target}`;
   throw new HerdrLinksError(`unsupported Herdr ${version}; cannot choose a safe link scheme`);
 }
 
@@ -336,7 +337,7 @@ export async function getSnapshot(socketPath: string): Promise<JsonObject> {
   const protocol = snapshot["protocol"];
   if (typeof version !== "string" || typeof protocol !== "number" || !SUPPORTED_RUNTIMES.has(`${version}/${protocol}`)) {
     throw new HerdrLinksError(
-      `unsupported Herdr ${String(version)} protocol ${String(protocol)}; verified runtimes: 0.7.5/18, 0.9.0/22`,
+      `unsupported Herdr ${String(version)} protocol ${String(protocol)}; verified runtimes: ${[...SUPPORTED_RUNTIMES].join(", ")}`,
     );
   }
   for (const key of ["panes", "workspaces", "tabs", "agents"] as const) {
@@ -421,8 +422,8 @@ export async function handleNavigation(environment: Environment): Promise<JsonOb
     throw new HerdrLinksError("link belongs to a different Herdr session or socket lifetime; regenerate it");
   }
   const snapshot = await getSnapshot(socketPath);
-  if (url.startsWith("herdr://") && snapshot["version"] !== "0.9.0") {
-    throw new HerdrLinksError("custom navigation targets require Herdr 0.9.0; regenerate this link");
+  if (url.startsWith("herdr://") && !CUSTOM_LINK_VERSIONS.has(String(snapshot["version"]))) {
+    throw new HerdrLinksError(`custom navigation targets require Herdr ${[...CUSTOM_LINK_VERSIONS].join(" or ")}; regenerate this link`);
   }
   const focusedPaneId = requiredString(context["focused_pane_id"], "invalid click context focused_pane_id");
   const origin = liveRow(snapshot, "panes", "pane_id", focusedPaneId);
@@ -795,7 +796,7 @@ function sameStoredRegistration(left: JsonObject | undefined, right: JsonObject 
 function validateHerdrCli(binary: string, runner: CliRunner): void {
   const version = runCli(binary, ["--version"], runner).trim();
   if (!SUPPORTED_CLI_VERSIONS.has(version)) {
-    throw new HerdrLinksError(`unsupported CLI ${version}; verified CLIs: herdr 0.7.5, herdr 0.9.0`);
+    throw new HerdrLinksError(`unsupported CLI ${version}; verified CLIs: ${[...SUPPORTED_CLI_VERSIONS].join(", ")}`);
   }
 }
 
