@@ -55,9 +55,9 @@ const CUSTOM_URL_PATTERN = new RegExp(
   `^herdr://navigation/v1/([0-9a-f]{64})/(agent|workspace|tab|pane)/(${WORKSPACE_ID}(?::[pt]${ID_NUMBER})?)$`,
 );
 
-const SUPPORTED_RUNTIMES = new Set(["0.7.5/18", "0.9.0/22", "0.9.3/22"]);
-const CUSTOM_LINK_VERSIONS = new Set(["0.9.0", "0.9.3"]);
-const SUPPORTED_CLI_VERSIONS = new Set(["herdr 0.7.5", "herdr 0.9.0", "herdr 0.9.3"]);
+const SUPPORTED_RUNTIMES = new Set(["0.7.5/18", "0.9.0/22", "0.9.3/22", "0.9.5/22"]);
+const CUSTOM_LINK_VERSIONS = new Set(["0.9.0", "0.9.3", "0.9.5"]);
+const SUPPORTED_CLI_VERSIONS = new Set(["herdr 0.7.5", "herdr 0.9.0", "herdr 0.9.3", "herdr 0.9.5"]);
 const FOCUS_METHODS: Readonly<Record<TargetKind, readonly [string, string, string]>> = {
   agent: ["pane.focus", "pane_id", "pane_info"],
   workspace: ["workspace.focus", "workspace_id", "workspace_info"],
