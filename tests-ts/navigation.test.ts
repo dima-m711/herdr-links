@@ -525,6 +525,8 @@ test("non-sockets and unsupported runtime pairs fail", async () => {
       ["0.9.0", 18],
       ["0.9.3", 18],
       ["0.9.4", 22],
+      ["0.9.5", 18],
+      ["0.9.6", 22],
       ["0.8.2", 21],
     ] as const) {
       const path = join(directory, `herdr-${version}-${protocol}.sock`);
@@ -542,17 +544,17 @@ test("non-sockets and unsupported runtime pairs fail", async () => {
   }
 });
 
-test("Herdr 0.9.3 generates and handles navigation links", async () => {
+for (const version of ["0.9.3", "0.9.5"]) test(`Herdr ${version} generates and handles navigation links`, async () => {
   const directory = temporaryDirectory();
   try {
     const path = join(directory, "herdr.sock");
-    const snapshot = { ...SNAPSHOT, version: "0.9.3", protocol: 22 };
+    const snapshot = { ...SNAPSHOT, version, protocol: 22 };
     const server = await FakeHerdrServer.start(path, (request) =>
       request["method"] === "session.snapshot"
         ? { id: request["id"], result: { type: "session_snapshot", snapshot } }
         : successResponder(request), 3);
     const markdown = await navigationMarkdown("agent", "wA:pC", "builder", path);
-    const url = navigationUrl("agent", "wA:pC", path, "0.9.3");
+    const url = navigationUrl("agent", "wA:pC", path, version);
     assert.equal(markdown, `[builder](${url})`);
     assert.match(url, /^herdr:\/\/navigation\/v1\//u);
     await handleNavigation(invocationEnvironment(path, url));
@@ -571,6 +573,7 @@ test("all verified runtime pairs are accepted", async () => {
       ["0.7.5", 18],
       ["0.9.0", 22],
       ["0.9.3", 22],
+      ["0.9.5", 22],
     ] as const) {
       const path = join(directory, `herdr-${version}.sock`);
       const snapshot = { ...SNAPSHOT, version, protocol };
