@@ -781,9 +781,9 @@ class ManifestTest(unittest.TestCase):
         with (ROOT / "herdr-plugin.toml").open("rb") as file:
             manifest = tomllib.load(file)
         self.assertEqual(manifest["id"], herdr_links.PLUGIN_ID)
-        self.assertEqual(manifest["version"], "0.4.0")
+        self.assertEqual(manifest["version"], "0.5.0")
         self.assertEqual(manifest["min_herdr_version"], "0.7.5")
-        self.assertEqual(manifest["platforms"], ["macos"])
+        self.assertEqual(manifest["platforms"], ["macos", "linux"])
         self.assertEqual(
             [entry["command"] for entry in manifest["build"]],
             [

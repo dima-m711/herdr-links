@@ -1,9 +1,9 @@
 id = "herdr-links"
 name = "Herdr Links"
-version = "0.4.0"
+version = "0.5.0"
 min_herdr_version = "0.7.5"
 description = "Session-bound navigation links for agent, workspace, tab, and pane references in Herdr."
-platforms = ["macos"]
+platforms = ["macos", "linux"]
 
 [[build]]
 command = ["npm", "ci", "--include=dev", "--ignore-scripts", "--no-audit", "--no-fund"]
