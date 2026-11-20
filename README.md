@@ -6,7 +6,7 @@ Herdr Links creates secure, session-bound links to agents, workspaces, tabs, and
 
 ## Requirements
 
-- macOS
+- macOS or Linux
 - Herdr 0.9.5, 0.9.3, 0.9.0, or 0.7.5
 - Node.js 20 or newer, available whenever Herdr or Pi runs the plugin
 - npm, required during installation and updates

@@ -9,7 +9,7 @@ Requirements:
 - Node.js 20 or newer
 - npm
 - Python 3.11 or newer for the compatibility-reference tests
-- macOS and Herdr for live integration checks
+- macOS or Linux, and Herdr, for live integration checks
 
 Install locked dependencies and run the validation suite:
 
